@@ -23,7 +23,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# global dictionary to track ongoing operations
+# global dictionary to track ongoing operations (user-specific)
 renaming_operations = {}
 
 # small caps mapping
@@ -70,7 +70,7 @@ QUALITY_PATTERNS = [
 async def extract_season_episode(source_text, user_id):
     """extract season, episode, chapter, or volume numbers from source (filename or caption)"""
     extraction_mode = await codeflixbots.get_extraction_mode(user_id)
-    logger.info(f"Extracting metadata from {extraction_mode}: {source_text}")
+    logger.info(f"Extracting metadata from {extraction_mode} for user {user_id}: {source_text}")
     
     for pattern, (season_group, metadata_type) in SEASON_EPISODE_PATTERNS:
         match = pattern.search(source_text)
@@ -85,7 +85,7 @@ async def extract_season_episode(source_text, user_id):
 async def extract_quality(source_text, user_id):
     """extract quality information from source (filename or caption)"""
     extraction_mode = await codeflixbots.get_extraction_mode(user_id)
-    logger.info(f"Extracting quality from {extraction_mode}: {source_text}")
+    logger.info(f"Extracting quality from {extraction_mode} for user {user_id}: {source_text}")
     
     for pattern, extractor in QUALITY_PATTERNS:
         match = pattern.search(source_text)
@@ -218,7 +218,7 @@ async def handle_extract_callback(client, callback_query):
     await callback_query.message.edit_text(
         to_small_caps(
             f"ᴇxᴛʀᴀᴄᴛɪᴏɴ ᴍᴏᴅᴇ ꜱᴇᴛ ᴛᴏ: **{mode.capitalize()}**\n"
-            f"ᴍᴇᴛᴀᴅᴀᴛᴀ (ꜱᴇᴀꜱᴏɴ, ᴇᴘɪꜱᴏᴅᴇ, Qᴜᴀʟɪᴛʏ, ᴇᴛᴄ.) ᴡɪʟʟ ɴᴏᴡ ʙᴇ ᴇxᴛʀᴀᴄᴛᴇᴅ ꜰʀᴏᴍ ᴛʜᴇ {mode}."
+            f"ᴍᴇᴛᴀᴅᴀᴛᴀ (ꜱᴇᴀꜱᴏɴ, ᴇᴘɪꜱᴏᴅᴇ, Qᴜᴀʟɪᴛʏ, ᴇᴛᴄ.) ᴡɪʟʟ ɴᴏᴡ � Wtedy be extracted from the {mode}."
         ),
         reply_markup=keyboard
     )
@@ -256,11 +256,24 @@ async def auto_rename_files(client, message):
     if await check_anti_nsfw(file_name, message):
         return await message.reply_text(to_small_caps("ɴꜱꜰᴡ ᴄᴏɴᴛᴇɴᴛ ᴅᴇᴛᴇᴄᴛᴇᴅ"))
 
-    # prevent duplicate processing
-    if file_id in renaming_operations:
-        if (datetime.now() - renaming_operations[file_id]).seconds < 10:
+    # user-specific operation key
+    operation_key = f"{user_id}:{file_id}"
+
+    # prevent duplicate processing for the same user and file
+    if operation_key in renaming_operations:
+        if (datetime.now() - renaming_operations[operation_key]).seconds < 30:
+            logger.info(f"Operation already in progress for {operation_key}")
             return
-    renaming_operations[file_id] = datetime.now()
+    renaming_operations[operation_key] = datetime.now()
+
+    # clean up stale operations
+    stale_keys = [
+        key for key, timestamp in renaming_operations.items()
+        if (datetime.now() - timestamp).seconds > 30
+    ]
+    for key in stale_keys:
+        renaming_operations.pop(key, None)
+        logger.info(f"Cleaned up stale operation: {key}")
 
     try:
         # determine extraction source (filename or caption)
@@ -291,8 +304,8 @@ async def auto_rename_files(client, message):
         # prepare file paths
         ext = os.path.splitext(file_name)[1] or ('.mp4' if media_type == 'video' else '.mp3')
         new_filename = f"{format_template}{ext}"
-        download_path = f"downloads/{new_filename}"
-        metadata_path = f"metadata/{new_filename}"
+        download_path = f"downloads/{user_id}/{new_filename}"
+        metadata_path = f"metadata/{user_id}/{new_filename}"
         
         os.makedirs(os.path.dirname(download_path), exist_ok=True)
         os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
@@ -357,9 +370,9 @@ async def auto_rename_files(client, message):
             raise
 
     except Exception as e:
-        logger.error(f"Processing error: {e}")
+        logger.error(f"Processing error for user {user_id}: {e}")
         await message.reply_text(to_small_caps(f"ᴇʀʀᴏʀ: {str(e)}"))
     finally:
         # clean up files
         await cleanup_files(download_path, metadata_path, thumb_path)
-        renaming_operations.pop(file_id, None)
+        renaming_operations.pop(operation_key, None)
