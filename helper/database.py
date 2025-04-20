@@ -26,7 +26,7 @@ class Database:
             metadata=True,
             metadata_code="Telegram : @Codeflix_Bots",
             format_template=None,
-            extraction_mode="filename",  # Default extraction mode
+            extraction_mode="filename",  # default extraction mode
             ban_status=dict(
                 is_banned=False,
                 ban_duration=0,
@@ -185,7 +185,7 @@ class Database:
         await self.col.update_one({'_id': int(user_id)}, {'$set': {'video': video}})
 
     async def set_extraction_mode(self, user_id, mode):
-        """Set the extraction mode (filename or caption) for a user"""
+        """set the extraction mode (filename or caption) for a user"""
         try:
             await self.col.update_one(
                 {"_id": int(user_id)}, {"$set": {"extraction_mode": mode}}
@@ -194,7 +194,7 @@ class Database:
             logging.error(f"Error setting extraction mode for user {user_id}: {e}")
 
     async def get_extraction_mode(self, user_id):
-        """Get the extraction mode for a user (default: filename)"""
+        """get the extraction mode for a user (default: filename)"""
         try:
             user = await self.col.find_one({"_id": int(user_id)})
             return user.get("extraction_mode", "filename") if user else "filename"
