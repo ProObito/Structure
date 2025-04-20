@@ -5,7 +5,6 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQ
 from pyrogram.errors import MessageNotModified, ChatAdminRequired
 from config import Config
 from helper.database import Database
-from helper.texts import Txt
 from helper.utils import send_log
 
 # Configure logging
