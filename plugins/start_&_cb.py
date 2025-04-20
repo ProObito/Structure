@@ -3,7 +3,7 @@ import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pyrogram.errors import MessageNotModified, ChatAdminRequired
-from config import Config, txt
+from config import Config
 from helper.database import Database
 from helper.utils import send_log
 
