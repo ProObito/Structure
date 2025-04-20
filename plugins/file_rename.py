@@ -26,31 +26,28 @@ logger = logging.getLogger(__name__)
 # Global dictionary to track ongoing operations
 renaming_operations = {}
 
-# Enhanced regex patterns for season and episode extraction
-SEASON_EPISODE_PATTERNS = [
-    # Standard patterns (S01E02, S01EP02)
-    (re.compile(r'S(\d+)(?:E|EP)(\d+)'), ('season', 'episode')),
-    # Patterns with spaces/dashes (S01 E02, S01-EP02)
-    (re.compile(r'S(\d+)[\s-]*(?:E|EP)(\d+)'), ('season', 'episode')),
-    # Full text patterns (Season 1 Episode 2)
+# Patterns for extracting volume, chapter, season, episode
+METADATA_PATTERNS = [
+    (re.compile(r'(?:Vol|Volume|V)\s*(\d+)', re.IGNORECASE), ('volume', None)),
+    (re.compile(r'(?:Ch|Chapter|C)\s*(\d+)', re.IGNORECASE), (None, 'chapter')),
+    (re.compile(r'V(\d+)[^\d]*C(\d+)', re.IGNORECASE), ('volume', 'chapter')),
+    (re.compile(r'Volume\s*(\d+)\s*Chapter\s*(\d+)', re.IGNORECASE), ('volume', 'chapter')),
+    (re.compile(r'S(\d+)(?:E|EP)(\d+)', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'S(\d+)[\s-]*(?:E|EP)(\d+)', re.IGNORECASE), ('season', 'episode')),
     (re.compile(r'Season\s*(\d+)\s*Episode\s*(\d+)', re.IGNORECASE), ('season', 'episode')),
-    # Patterns with brackets/parentheses ([S01][E02])
-    (re.compile(r'\[S(\d+)\]\[E(\d+)\]'), ('season', 'episode')),
-    # Fallback patterns (S01 13, Episode 13)
-    (re.compile(r'S(\d+)[^\d]*(\d+)'), ('season', 'episode')),
+    (re.compile(r'\[S(\d+)\]\[E(\d+)\]', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'S(\d+)[^\d]*(\d+)', re.IGNORECASE), ('season', 'episode')),
     (re.compile(r'(?:E|EP|Episode)\s*(\d+)', re.IGNORECASE), (None, 'episode')),
-    # Final fallback (standalone number)
-    (re.compile(r'\b(\d+)\b'), (None, 'episode'))
+    (re.compile(r'\b(\d+)\b', re.IGNORECASE), (None, 'episode'))
 ]
 
-# Quality detection patterns
 QUALITY_PATTERNS = [
-    (re.compile(r'\b(\d{3,4}[pi])\b', re.IGNORECASE), lambda m: m.group(1)),  # 1080p, 720p
-    (re.compile(r'\b(4k|2160p)\b', re.IGNORECASE), lambda m: "4k"),
-    (re.compile(r'\b(2k|1440p)\b', re.IGNORECASE), lambda m: "2k"),
-    (re.compile(r'\b(HDRip|HDTV)\b', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\b(4kX264|4kx265)\b', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1))  # [1080p]
+    (re.compile(r'\b(\d{3,4}[pi])\b', re.IGNORECASE), lambda m: m.group(1).upper()),
+    (re.compile(r'\b(4k|2160p)\b', re.IGNORECASE), lambda m: "4K"),
+    (re.compile(r'\b(2k|1440p)\b', re.IGNORECASE), lambda m: "2K"),
+    (re.compile(r'\b(HDRip|HDTV|WebRip|BluRay)\b', re.IGNORECASE), lambda m: m.group(1).upper()),
+    (re.compile(r'\b(4kX264|4kX265|X264|X265|X26)\b', re.IGNORECASE), lambda m: "X264" if m.group(1).upper() == "X26" else m.group(1).upper()),
+    (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1).upper())
 ]
 
 def extract_season_episode(input_text, rename_mode):
@@ -60,9 +57,9 @@ def extract_season_episode(input_text, rename_mode):
         if match:
             season = match.group(1) if season_group else None
             episode = match.group(2) if episode_group else match.group(1)
-            logger.info(f"Extracted season: {season}, episode: {episode} from {filename}")
+            logger.info(f"Extracted season: {season}, episode: {episode} from {input_text, rename_mode}")
             return season, episode
-    logger.warning(f"No season/episode pattern matched for {filename}")
+    logger.warning(f"No season/episode pattern matched for {input_text, rename_mode}")
     return None, None
 
 def extract_quality(input_text, rename_mode):
@@ -71,9 +68,9 @@ def extract_quality(input_text, rename_mode):
         match = pattern.search(input_text, rename_mode)
         if match:
             quality = extractor(match)
-            logger.info(f"Extracted quality: {quality} from {filename}")
+            logger.info(f"Extracted quality: {quality} from {input_text, rename_mode}")
             return quality
-    logger.warning(f"No quality pattern matched for {filename}")
+    logger.warning(f"No quality pattern matched for {input_text, rename_mode}")
     return "Unknown"
 
 async def cleanup_files(*paths):
@@ -180,16 +177,16 @@ async def auto_rename_files(client, message):
 
     try:
         # Extract metadata from filename
-        season, episode = extract_season_episode(file_name)
-        quality = extract_quality(file_name)
+        season, episode = extract_season_episode(input_text, rename_mode)
+        quality = extract_quality(input_text, rename_mode)
         
         # Replace placeholders in template
         replacements = {
-            '{season}': season or 'XX',
-            '{episode}': episode or 'XX',
+            '{season}': season or 'SKILL_ISSUE',
+            '{episode}': episode or 'SKILL_ISSUE',
             '{quality}': quality,
-            'Season': season or 'XX',
-            'Episode': episode or 'XX',
+            'Season': season or 'SKILL_ISSUE',
+            'Episode': episode or 'SKILL_ISSUE',
             'QUALITY': quality
         }
         
