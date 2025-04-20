@@ -12,7 +12,7 @@ class Config(object):
     # database config
     DB_NAME = os.environ.get("DB_NAME","Yato")     
     DB_URL  = os.environ.get("DB_URL","mongodb")
-    PORT = os.environ.get("PORT", "8080")
+    PORT = os.environ.get("PORT", "8078")
  
     # other configs
     BOT_UPTIME  = time.time()
