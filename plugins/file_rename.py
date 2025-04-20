@@ -53,10 +53,10 @@ QUALITY_PATTERNS = [
     (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1))  # [1080p]
 ]
 
-def extract_season_episode(filename):
+def extract_season_episode(input_text, rename_mode):
     """Extract season and episode numbers from filename"""
     for pattern, (season_group, episode_group) in SEASON_EPISODE_PATTERNS:
-        match = pattern.search(filename)
+        match = pattern.search(input_text, rename_mode)
         if match:
             season = match.group(1) if season_group else None
             episode = match.group(2) if episode_group else match.group(1)
@@ -65,10 +65,10 @@ def extract_season_episode(filename):
     logger.warning(f"No season/episode pattern matched for {filename}")
     return None, None
 
-def extract_quality(filename):
+def extract_quality(input_text, rename_mode):
     """Extract quality information from filename"""
     for pattern, extractor in QUALITY_PATTERNS:
-        match = pattern.search(filename)
+        match = pattern.search(input_text, rename_mode)
         if match:
             quality = extractor(match)
             logger.info(f"Extracted quality: {quality} from {filename}")
