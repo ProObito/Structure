@@ -13,7 +13,7 @@ class Config(object):
     # database config
     DB_NAME = os.environ.get("DB_NAME","Cluster0")     
     DB_URL  = os.environ.get("DB_URL","mongodb+srv://spxsolo:umaid2008@cluster0.7fbux.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
-    PORT = os.environ.get("PORT", "3372")
+    PORT = os.environ.get("PORT", "5363")
 
     # other configs
     BOT_UPTIME  = time.time()
