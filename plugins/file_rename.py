@@ -16,37 +16,48 @@ from helper.utils import progress_for_pyrogram, humanbytes, convert
 from helper.database import codeflixbots
 from config import Config
 
-# Configure logging
+# configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Global dictionary to track ongoing operations
+# global dictionary to track ongoing operations
 renaming_operations = {}
 
-# Enhanced regex patterns for season, episode, chapter, and volume extraction
+# small caps mapping
+SMALL_CAPS_MAP = {
+    'a': 'ᴀ', 'b': 'ʙ', 'c': 'ᴄ', 'd': 'ᴅ', 'e': 'ᴇ', 'f': 'ꜰ', 'g': 'ɢ', 'h': 'ʜ', 'i': 'ɪ',
+    'j': 'ᴊ', 'k': 'ᴋ', 'l': 'ʟ', 'm': 'ᴍ', 'n': 'ɴ', 'o': 'ᴏ', 'p': 'ᴘ', 'q': 'Q', 'r': 'ʀ',
+    's': 'ꜱ', 't': 'ᴛ', 'u': 'ᴜ', 'v': 'ᴠ', 'w': 'ᴡ', 'x': 'x', 'y': 'ʏ', 'z': 'ᴢ'
+}
+
+def to_small_caps(text):
+    """convert text to small caps using unicode characters"""
+    return ''.join(SMALL_CAPS_MAP.get(c.lower(), c) for c in text)
+
+# enhanced regex patterns for season, episode, chapter, and volume extraction
 SEASON_EPISODE_PATTERNS = [
-    # Standard patterns (S01E02, S01EP02)
+    # standard patterns (S01E02, S01EP02)
     (re.compile(r'S(\d+)(?:E|EP)(\d+)'), ('season', 'episode')),
-    # Patterns with spaces/dashes (S01 E02, S01-EP02)
+    # patterns with spaces/dashes (S01 E02, S01-EP02)
     (re.compile(r'S(\d+)[\s-]*(?:E|EP)(\d+)'), ('season', 'episode')),
-    # Full text patterns (Season 1 Episode 2)
+    # full text patterns (Season 1 Episode 2)
     (re.compile(r'Season\s*(\d+)\s*Episode\s*(\d+)', re.IGNORECASE), ('season', 'episode')),
-    # Patterns with brackets/parentheses ([S01][E02])
+    # patterns with brackets/parentheses ([S01][E02])
     (re.compile(r'\[S(\d+)\]\[E(\d+)\]'), ('season', 'episode')),
-    # Fallback patterns (S01 13, Episode 13)
+    # fallback patterns (S01 13, Episode 13)
     (re.compile(r'S(\d+)[^\d]*(\d+)'), ('season', 'episode')),
     (re.compile(r'(?:E|EP|Episode)\s*(\d+)', re.IGNORECASE), (None, 'episode')),
-    # Chapter and Volume patterns
+    # chapter and volume patterns
     (re.compile(r'Chapter\s*(\d+)', re.IGNORECASE), (None, 'chapter')),
     (re.compile(r'Volume\s*(\d+)', re.IGNORECASE), (None, 'volume')),
-    # Final fallback (standalone number)
+    # final fallback (standalone number)
     (re.compile(r'\b(\d+)\b'), (None, 'episode'))
 ]
 
-# Quality detection patterns
+# quality detection patterns
 QUALITY_PATTERNS = [
     (re.compile(r'\b(\d{3,4}[pi])\b', re.IGNORECASE), lambda m: m.group(1)),  # 1080p, 720p
     (re.compile(r'\b(4k|2160p)\b', re.IGNORECASE), lambda m: "4k"),
@@ -57,7 +68,7 @@ QUALITY_PATTERNS = [
 ]
 
 async def extract_season_episode(source_text, user_id):
-    """Extract season, episode, chapter, or volume numbers from source (filename or caption)"""
+    """extract season, episode, chapter, or volume numbers from source (filename or caption)"""
     extraction_mode = await codeflixbots.get_extraction_mode(user_id)
     logger.info(f"Extracting metadata from {extraction_mode}: {source_text}")
     
@@ -72,7 +83,7 @@ async def extract_season_episode(source_text, user_id):
     return None, None, None
 
 async def extract_quality(source_text, user_id):
-    """Extract quality information from source (filename or caption)"""
+    """extract quality information from source (filename or caption)"""
     extraction_mode = await codeflixbots.get_extraction_mode(user_id)
     logger.info(f"Extracting quality from {extraction_mode}: {source_text}")
     
@@ -86,7 +97,7 @@ async def extract_quality(source_text, user_id):
     return "Unknown"
 
 async def cleanup_files(*paths):
-    """Safely remove files if they exist"""
+    """safely remove files if they exist"""
     for path in paths:
         try:
             if path and os.path.exists(path):
@@ -95,7 +106,7 @@ async def cleanup_files(*paths):
             logger.error(f"Error removing {path}: {e}")
 
 async def process_thumbnail(thumb_path):
-    """Process and resize thumbnail image"""
+    """process and resize thumbnail image"""
     if not thumb_path or not os.path.exists(thumb_path):
         return None
     
@@ -110,7 +121,7 @@ async def process_thumbnail(thumb_path):
         return None
 
 async def add_metadata(input_path, output_path, user_id):
-    """Add metadata to media file using ffmpeg"""
+    """add metadata to media file using ffmpeg"""
     ffmpeg = shutil.which('ffmpeg')
     if not ffmpeg:
         raise RuntimeError("FFmpeg not found in PATH")
@@ -151,52 +162,78 @@ async def add_metadata(input_path, output_path, user_id):
 
 @Client.on_message(filters.private & filters.command("setextract"))
 async def set_extract_command(client, message):
-    """Handle /setextract command to choose extraction mode"""
+    """handle /setextract command to choose extraction mode"""
     user_id = message.from_user.id
     current_mode = await codeflixbots.get_extraction_mode(user_id)
 
-    # Create inline keyboard with Filename and Caption options
+    # create inline keyboard with filename and caption options, showing ✅ for current mode
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("Filename", callback_data=f"extract_filename_{user_id}"),
-            InlineKeyboardButton("Caption", callback_data=f"extract_caption_{user_id}")
+            InlineKeyboardButton(
+                f"filename {'✅' if current_mode == 'filename' else ''}",
+                callback_data=f"extract_filename_{user_id}"
+            ),
+            InlineKeyboardButton(
+                f"caption {'✅' if current_mode == 'caption' else ''}",
+                callback_data=f"extract_caption_{user_id}"
+            )
         ]
     ])
 
     await message.reply_text(
-        f"Current extraction mode: **{current_mode.capitalize()}**\n"
-        "Choose the source for metadata extraction (season, episode, quality, etc.):",
+        to_small_caps(
+            f"ᴄᴜʀʀᴇɴᴛ ᴇxᴛʀᴀᴄᴛɪᴏɴ ᴍᴏᴅᴇ: **{current_mode.capitalize()}**\n"
+            "ᴄʜᴏᴏꜱᴇ ᴛʜᴇ ꜱᴏᴜʀᴄᴇ ꜰᴏʀ ᴍᴇᴛᴀᴅᴀᴛᴀ ᴇxᴛʀᴀᴄᴛɪᴏɴ (ꜱᴇᴀꜱᴏɴ, ᴇᴘɪꜱᴏᴅᴇ, Qᴜᴀʟɪᴛʏ, ᴇᴛᴄ.):"
+        ),
         reply_markup=keyboard
     )
 
 @Client.on_callback_query(filters.regex(r"extract_(filename|caption)_(\d+)"))
 async def handle_extract_callback(client, callback_query):
-    """Handle callback queries for extraction mode selection"""
+    """handle callback queries for extraction mode selection"""
     mode = callback_query.matches[0].group(1)  # filename or caption
     user_id = int(callback_query.matches[0].group(2))
 
     if callback_query.from_user.id != user_id:
-        await callback_query.answer("This button is not for you!", show_alert=True)
+        await callback_query.answer(to_small_caps("ᴛʜɪꜱ ʙᴜᴛᴛᴏɴ ɪꜱ ɴᴏᴛ ꜰᴏʀ ʏᴏᴜ!"), show_alert=True)
         return
 
-    # Update extraction mode in the database
+    # update extraction mode in the database
     await codeflixbots.set_extraction_mode(user_id, mode)
+
+    # update inline keyboard to reflect new mode with ✅
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                f"filename {'✅' if mode == 'filename' else ''}",
+                callback_data=f"extract_filename_{user_id}"
+            ),
+            InlineKeyboardButton(
+                f"caption {'✅' if mode == 'caption' else ''}",
+                callback_data=f"extract_caption_{user_id}"
+            )
+        ]
+    ])
+
     await callback_query.message.edit_text(
-        f"Extraction mode set to: **{mode.capitalize()}**\n"
-        "Metadata (season, episode, quality, etc.) will now be extracted from the {mode}."
+        to_small_caps(
+            f"ᴇxᴛʀᴀᴄᴛɪᴏɴ ᴍᴏᴅᴇ ꜱᴇᴛ ᴛᴏ: **{mode.capitalize()}**\n"
+            f"ᴍᴇᴛᴀᴅᴀᴛᴀ (ꜱᴇᴀꜱᴏɴ, ᴇᴘɪꜱᴏᴅᴇ, Qᴜᴀʟɪᴛʏ, ᴇᴛᴄ.) ᴡɪʟʟ ɴᴏᴡ ʙᴇ ᴇxᴛʀᴀᴄᴛᴇᴅ ꜰʀᴏᴍ ᴛʜᴇ {mode}."
+        ),
+        reply_markup=keyboard
     )
-    await callback_query.answer(f"Set to {mode} mode")
+    await callback_query.answer(to_small_caps(f"ꜱᴇᴛ ᴛᴏ {mode} ᴍᴏᴅᴇ"))
 
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
 async def auto_rename_files(client, message):
-    """Main handler for auto-renaming files"""
+    """main handler for auto-renaming files"""
     user_id = message.from_user.id
     format_template = await codeflixbots.get_format_template(user_id)
     
     if not format_template:
-        return await message.reply_text("Please set a rename format using /autorename")
+        return await message.reply_text(to_small_caps("ᴘʟᴇᴀꜱᴇ ꜱᴇᴛ ᴀ ʀᴇɴᴀᴍᴇ ꜰᴏʀᴍᴀᴛ ᴜꜱɪɴɢ /autorename"))
 
-    # Get file information
+    # get file information
     if message.document:
         file_id = message.document.file_id
         file_name = message.document.file_name
@@ -213,28 +250,28 @@ async def auto_rename_files(client, message):
         file_size = message.audio.file_size
         media_type = "audio"
     else:
-        return await message.reply_text("Unsupported file type")
+        return await message.reply_text(to_small_caps("ᴜɴꜱᴜᴘᴘᴏʀᴛᴇᴅ ꜰɪʟᴇ ᴛʏᴘᴇ"))
 
-    # NSFW check
+    # nsfw check
     if await check_anti_nsfw(file_name, message):
-        return await message.reply_text("NSFW content detected")
+        return await message.reply_text(to_small_caps("ɴꜱꜰᴡ ᴄᴏɴᴛᴇɴᴛ ᴅᴇᴛᴇᴄᴛᴇᴅ"))
 
-    # Prevent duplicate processing
+    # prevent duplicate processing
     if file_id in renaming_operations:
         if (datetime.now() - renaming_operations[file_id]).seconds < 10:
             return
     renaming_operations[file_id] = datetime.now()
 
     try:
-        # Determine extraction source (filename or caption)
+        # determine extraction source (filename or caption)
         extraction_mode = await codeflixbots.get_extraction_mode(user_id)
         source_text = message.caption or file_name if extraction_mode == "caption" else file_name
 
-        # Extract metadata from source
+        # extract metadata from source
         season, value, metadata_type = await extract_season_episode(source_text, user_id)
         quality = await extract_quality(source_text, user_id)
         
-        # Replace placeholders in template
+        # replace placeholders in template
         replacements = {
             '{season}': season or 'XX',
             '{episode}': value or 'XX' if metadata_type == 'episode' else 'XX',
@@ -251,7 +288,7 @@ async def auto_rename_files(client, message):
         for placeholder, value in replacements.items():
             format_template = format_template.replace(placeholder, value)
 
-        # Prepare file paths
+        # prepare file paths
         ext = os.path.splitext(file_name)[1] or ('.mp4' if media_type == 'video' else '.mp3')
         new_filename = f"{format_template}{ext}"
         download_path = f"downloads/{new_filename}"
@@ -260,35 +297,35 @@ async def auto_rename_files(client, message):
         os.makedirs(os.path.dirname(download_path), exist_ok=True)
         os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
 
-        # Download file
-        msg = await message.reply_text("**Downloading...**")
+        # download file
+        msg = await message.reply_text(to_small_caps("**ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ...**"))
         try:
             file_path = await client.download_media(
                 message,
                 file_name=download_path,
                 progress=progress_for_pyrogram,
-                progress_args=("Downloading...", msg, time.time())
+                progress_args=(to_small_caps("ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ..."), msg, time.time())
             )
         except Exception as e:
-            await msg.edit(f"Download failed: {e}")
+            await msg.edit(to_small_caps(f"ᴅᴏᴡɴʟᴏᴀᴅ ꜰᴀɪʟᴇᴅ: {e}"))
             raise
 
-        # Process metadata
-        await msg.edit("**Processing metadata...**")
+        # process metadata
+        await msg.edit(to_small_caps("**ᴘʀᴏᴄᴇꜱꜱɪɴɢ ᴍᴇᴛᴀᴅᴀᴛᴀ...**"))
         try:
             await add_metadata(file_path, metadata_path, user_id)
             file_path = metadata_path
         except Exception as e:
-            await msg.edit(f"Metadata processing failed: {e}")
+            await msg.edit(to_small_caps(f"ᴍᴇᴛᴀᴅᴀᴛᴀ ᴘʀᴏᴄᴇꜱꜱɪɴɢ ꜰᴀɪʟᴇᴅ: {e}"))
             raise
 
-        # Prepare for upload
-        await msg.edit("**Preparing upload...**")
+        # prepare for upload
+        await msg.edit(to_small_caps("**ᴘʀᴇᴘᴀʀɪɴɢ ᴜᴘʟᴏᴀᴅ...**"))
         caption = await codeflixbots.get_caption(message.chat.id) or f"**{new_filename}**"
         thumb = await codeflixbots.get_thumbnail(message.chat.id)
         thumb_path = None
 
-        # Handle thumbnail
+        # handle thumbnail
         if thumb:
             thumb_path = await client.download_media(thumb)
         elif media_type == "video" and message.video.thumbs:
@@ -296,15 +333,15 @@ async def auto_rename_files(client, message):
         
         thumb_path = await process_thumbnail(thumb_path)
 
-        # Upload file
-        await msg.edit("**Uploading...**")
+        # upload file
+        await msg.edit(to_small_caps("**ᴜᴘʟᴏᴀᴅɪɴɢ...**"))
         try:
             upload_params = {
                 'chat_id': message.chat.id,
                 'caption': caption,
                 'thumb': thumb_path,
                 'progress': progress_for_pyrogram,
-                'progress_args': ("Uploading...", msg, time.time())
+                'progress_args': (to_small_caps("ᴜᴘʟᴏᴀᴅɪɴɢ..."), msg, time.time())
             }
 
             if media_type == "document":
@@ -316,13 +353,13 @@ async def auto_rename_files(client, message):
 
             await msg.delete()
         except Exception as e:
-            await msg.edit(f"Upload failed: {e}")
+            await msg.edit(to_small_caps(f"ᴜᴘʟᴏᴀᴅ ꜰᴀɪʟᴇᴅ: {e}"))
             raise
 
     except Exception as e:
         logger.error(f"Processing error: {e}")
-        await message.reply_text(f"Error: {str(e)}")
+        await message.reply_text(to_small_caps(f"ᴇʀʀᴏʀ: {str(e)}"))
     finally:
-        # Clean up files
+        # clean up files
         await cleanup_files(download_path, metadata_path, thumb_path)
         renaming_operations.pop(file_id, None)
