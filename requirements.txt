@@ -1,4 +1,4 @@
-pyrogram
+https://codeload.github.com/KurimuzonAkuma/pyrogram/zip/refs/heads/dev
 TgCrypto
 motor
 dnspython
@@ -7,7 +7,6 @@ Pillow
 aiohttp
 pytz
 psutil
-pyrofork
 cachetools
 telegram 
 aiofiles
