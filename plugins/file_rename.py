@@ -96,14 +96,6 @@ async def extract_quality(source_text, user_id):
     logger.warning(f"No quality pattern matched for {source_text}")
     return "Unknown"
 
-async def cleanup_files(*paths):
-    """safely remove files if they exist"""
-    for path in paths:
-        try:
-            if path and os.path.exists(path):
-                os.remove(path)
-        except Exception as e:
-            logger.error(f"Error removing {path}: {e}")
 
 async def process_thumbnail(thumb_path):
     """process and resize thumbnail image"""
@@ -160,9 +152,9 @@ async def add_metadata(input_path, output_path, user_id):
     if process.returncode != 0:
         raise RuntimeError(f"FFmpeg error: {stderr.decode()}")
 
-@Client.on_message(filters.private & filters.command("setextract"))
+@Client.on_message(filters.private & filters.command("extraction"))
 async def set_extract_command(client, message):
-    """handle /setextract command to choose extraction mode"""
+    """handle extraction command to choose extraction mode"""
     user_id = message.from_user.id
     current_mode = await codeflixbots.get_extraction_mode(user_id)
 
@@ -266,15 +258,7 @@ async def auto_rename_files(client, message):
             return
     renaming_operations[operation_key] = datetime.now()
 
-    # clean up stale operations
-    stale_keys = [
-        key for key, timestamp in renaming_operations.items()
-        if (datetime.now() - timestamp).seconds > 30
-    ]
-    for key in stale_keys:
-        renaming_operations.pop(key, None)
-        logger.info(f"Cleaned up stale operation: {key}")
-
+    
     try:
         # determine extraction source (filename or caption)
         extraction_mode = await codeflixbots.get_extraction_mode(user_id)
@@ -373,6 +357,4 @@ async def auto_rename_files(client, message):
         logger.error(f"Processing error for user {user_id}: {e}")
         await message.reply_text(to_small_caps(f"ᴇʀʀᴏʀ: {str(e)}"))
     finally:
-        # clean up files
-        await cleanup_files(download_path, metadata_path, thumb_path)
         renaming_operations.pop(operation_key, None)
