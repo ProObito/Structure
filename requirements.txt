@@ -13,3 +13,4 @@ telegram
 aiofiles
 pathlib
 ffmpeg-python
+pyromod
