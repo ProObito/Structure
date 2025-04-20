@@ -1,8 +1,9 @@
-import motor.motor_asyncio, datetime, pytz
+import motor.motor_asyncio
+import datetime
+import pytz
 from config import Config
-import logging  # Added for logging errors and important information
+import logging
 from .utils import send_log
-
 
 class Database:
     def __init__(self, uri, database_name):
@@ -25,7 +26,7 @@ class Database:
             metadata=True,
             metadata_code="Telegram : @Codeflix_Bots",
             format_template=None,
-            extraction_choice=None,  # Added for extraction command
+            extraction_mode="filename",  # Default extraction mode
             ban_status=dict(
                 is_banned=False,
                 ban_duration=0,
@@ -183,25 +184,22 @@ class Database:
     async def set_video(self, user_id, video):
         await self.col.update_one({'_id': int(user_id)}, {'$set': {'video': video}})
 
-    async def get_user_choice(self, user_id):
-        try:
-            user = await self.col.find_one({"_id": int(user_id)})
-            return user.get("extraction_choice", None) if user else None
-        except Exception as e:
-            logging.error(f"Error getting extraction choice for user {user_id}: {e}")
-            return None
-
-    async def set_user_choice(self, user_id, choice):
+    async def set_extraction_mode(self, user_id, mode):
+        """Set the extraction mode (filename or caption) for a user"""
         try:
             await self.col.update_one(
-                {"_id": int(user_id)},
-                {"$set": {"extraction": choice}},
-                upsert=True
+                {"_id": int(user_id)}, {"$set": {"extraction_mode": mode}}
             )
-            return True
         except Exception as e:
-            logging.error(f"Error setting extraction choice for user {user_id}: {e}")
-            return False
+            logging.error(f"Error setting extraction mode for user {user_id}: {e}")
 
+    async def get_extraction_mode(self, user_id):
+        """Get the extraction mode for a user (default: filename)"""
+        try:
+            user = await self.col.find_one({"_id": int(user_id)})
+            return user.get("extraction_mode", "filename") if user else "filename"
+        except Exception as e:
+            logging.error(f"Error getting extraction mode for user {user_id}: {e}")
+            return "filename"
 
 codeflixbots = Database(Config.DB_URL, Config.DB_NAME)
