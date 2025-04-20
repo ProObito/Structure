@@ -25,6 +25,7 @@ class Database:
             metadata=True,
             metadata_code="Telegram : @Codeflix_Bots",
             format_template=None,
+            extraction_choice=None,  # Added for extraction command
             ban_status=dict(
                 is_banned=False,
                 ban_duration=0,
@@ -181,6 +182,26 @@ class Database:
 
     async def set_video(self, user_id, video):
         await self.col.update_one({'_id': int(user_id)}, {'$set': {'video': video}})
+
+    async def get_user_choice(self, user_id):
+        try:
+            user = await self.col.find_one({"_id": int(user_id)})
+            return user.get("extraction_choice", None) if user else None
+        except Exception as e:
+            logging.error(f"Error getting extraction choice for user {user_id}: {e}")
+            return None
+
+    async def set_user_choice(self, user_id, choice):
+        try:
+            await self.col.update_one(
+                {"_id": int(user_id)},
+                {"$set": {"extraction": choice}},
+                upsert=True
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error setting extraction choice for user {user_id}: {e}")
+            return False
 
 
 codeflixbots = Database(Config.DB_URL, Config.DB_NAME)
