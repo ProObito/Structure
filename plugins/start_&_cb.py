@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize bot
 app = Client(
-    "tessiabot"
+    "TessiaBot",
     api_id=Config.API_ID,
     api_hash=Config.API_HASH,
     bot_token=Config.BOT_TOKEN
