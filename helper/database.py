@@ -19,21 +19,8 @@ class Database:
 
     def new_user(self, id):
         return dict(
-            _id=int(id),
-            join_date=datetime.date.today().isoformat(),
-            file_id=None,
-            caption=None,
-            metadata=True,
-            metadata_code="Telegram : @Codeflix_Bots",
-            format_template=None,
             extraction_mode="filename",  # default extraction mode
-            ban_status=dict(
-                is_banned=False,
-                ban_duration=0,
-                banned_on=datetime.date.max.isoformat(),
-                ban_reason=''
             )
-        )
 
     async def add_user(self, b, m):
         u = m.from_user
