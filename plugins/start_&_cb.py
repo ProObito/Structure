@@ -71,7 +71,7 @@ async def about_command(client, message):
             [InlineKeyboardButton("• sᴜᴘᴘᴏʀᴛ", url='https://t.me/ahss_help_zone'),
              InlineKeyboardButton("ᴄᴏᴍᴍᴀɴᴅs •", callback_data="help")],
             [InlineKeyboardButton("• ᴅᴇᴠᴇʟᴏᴘᴇʀ", url='https://t.me/cosmic_awaken'),
-             InlineKeyboardButton("ɴᴇᴛᴡᴏʀᴋ •', url='https://t.me/society_network')],
+             InlineKeyboardButton("ɴᴇᴛᴡᴏʀᴋ •", url='https://t.me/society_network')],
             [InlineKeyboardButton("• ʙᴀᴄᴋ •", callback_data="home")]
         ])
     )
