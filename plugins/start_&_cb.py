@@ -3,9 +3,8 @@ import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pyrogram.errors import MessageNotModified, ChatAdminRequired
-from config import Config
+from config import Config, txt
 from helper.database import Database
-from helper.texts import Txt
 from helper.utils import send_log
 
 # Configure logging
