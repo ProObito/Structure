@@ -27,7 +27,7 @@ class Config:
     # Admin and owner settings
     OWNER_ID = 5585016974
     ADMINS = [int(admins) if id_pattern.search(admins) else admins for admins in os.environ.get('ADMINS', '5585016974 6497757690 7328629001').split()]
-    ADMINS = [int(admins) if id_pattern.search(admin) else admins for admins in os.environ.get('ADMINS', '5585016974 6497757690 7328629001').split()]
+    ADMINS = [int(admins) if id_pattern.search(admins) else admins for admins in os.environ.get('ADMINS', '5585016974 6497757690 7328629001').split()]
 
     # Channel settings
     FORCE_SUB_CHANNELS = os.environ.get('FORCE_SUB_CHANNELS', 'animes_crew, weebxcrew').split(', ')
