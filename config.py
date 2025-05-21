@@ -37,3 +37,7 @@ class Config:
 
     # Admin mode
     ADMIN_MODE = False
+#---------------------------------------------------------------------------------------------------₹
+    WEBHOOK = bool(os.environ.get("WEBHOOK", "False"))
+    WEBHOOK_PORT = os.environ.get("WEBHOOK_PORT", "6975")
+#--------
