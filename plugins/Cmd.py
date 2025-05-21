@@ -21,7 +21,9 @@ message_ids = {}
 
 # Admin mode check
 ADMIN_MODE = Config.ADMIN_MODE if hasattr(Config, 'ADMIN_MODE') else False
-
+ADMINS = Config.ADMINS if hasattr(Config, 'ADMINS') 
+OWNER_ID = Config.OWNER_ID if hasattr(Config, 'OWNER_ID')
+LOG_CHANNEL = Config.LOG_CHANNEL if hasattr(Config, 'LOG_CHANNEL') else False
 # Quality order dictionary
 quality_order = {
     "144p": 1, "240p": 2, "360p": 3, "480p": 4,
