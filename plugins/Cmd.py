@@ -8,7 +8,8 @@ from datetime import datetime, timedelta
 import pytz
 from config import Config
 from helper.database import codeflixbots
-from pyrogram.errors import FloodWait  # Import FloodWait
+from pyrogram.errors import FloodWait
+import time
 
 # MongoDB client setup
 mongo_client = AsyncIOMotorClient(Config.DB_URL)
@@ -48,6 +49,14 @@ def extract_quality(filename):
             return value if isinstance(value, str) else value(match)
     return "unknown"
 
+# Extract series name (before season/episode)
+def extract_series_name(filename):
+    filename = filename.lower()
+    season_match = re.search(r's(\d+)', filename)
+    if season_match:
+        return filename[:season_match.start()].strip("[] ").replace(".", " ").title()
+    return filename.split(".")[0].strip("[] ").replace(".", " ").title()
+
 # Sorting key function
 def sorting_key(f, sort_mode="episode"):
     filename = f["file_name"].lower()
@@ -65,6 +74,8 @@ def sorting_key(f, sort_mode="episode"):
     padded_episode = f"{episode:04d}"
     
     if sort_mode == "quality":
+        if quality == "unknown":
+            return (quality_priority, season, padded_episode, filename)
         return (quality_priority, season, padded_episode, filename)
     elif sort_mode == "title":
         return (filename, season, padded_episode, quality_priority)
@@ -72,6 +83,36 @@ def sorting_key(f, sort_mode="episode"):
         return (filename, quality_priority, season, padded_episode)
     else:  # episode (default)
         return (season, padded_episode, quality_priority, filename)
+
+# Detect missing episodes
+def detect_missing_episodes(files, sort_mode):
+    if not files:
+        return {}
+    
+    # Group files by series and quality
+    grouped = {}
+    for f in files:
+        series = extract_series_name(f["file_name"])
+        quality = extract_quality(f["file_name"])
+        episode_match = re.search(r'e(\d+)', f["file_name"].lower()) or re.search(r'ep?(\d+)', f["file_name"].lower())
+        if episode_match:
+            episode = int(episode_match.group(1))
+            key = (series, quality)
+            if key not in grouped:
+                grouped[key] = []
+            grouped[key].append(episode)
+    
+    missing = {}
+    for (series, quality), episodes in grouped.items():
+        if not episodes:
+            continue
+        episodes = sorted(episodes)
+        expected = list(range(min(episodes), max(episodes) + 1))
+        missing_eps = [ep for ep in expected if ep not in episodes]
+        if missing_eps:
+            missing[(series, quality)] = missing_eps
+    
+    return missing
 
 # Decorator to check ban status
 def check_ban_status(func):
@@ -120,7 +161,8 @@ async def start(client, message: Message):
             "sticker_id": Config.DEFAULT_STICKER,
             "file_count": 0,
             "last_activity": datetime.now(pytz.UTC),
-            "dump_channel": None
+            "dump_channel": None,
+            "leaderboard_timeframe": "day"
         }},
         upsert=True
     )
@@ -241,7 +283,7 @@ async def set_complete_sticker(client, message: Message):
 async def leaderboard(client, message: Message):
     user_id = message.from_user.id
     user_data = await users_col.find_one({"_id": user_id})
-    current_timeframe = user_data.get("leaderboard_timeframe", "day")  # Default to "day"
+    current_timeframe = user_data.get("leaderboard_timeframe", "day")
 
     buttons = InlineKeyboardMarkup([
         [
@@ -505,7 +547,7 @@ async def set_sticker_mode(client, message: Message):
         reply_markup=buttons
     )
 
-# Sort Command Handler (Replaces /esequence)
+# Sort Command Handler
 @Client.on_message(filters.command("sort") & filters.private)
 @check_ban_status
 async def sort_sequence(client, message: Message):
@@ -531,13 +573,17 @@ async def sort_sequence(client, message: Message):
     completion_sticker = bot_settings.get("completion_sticker", Config.DEFAULT_STICKER) if bot_settings else Config.DEFAULT_STICKER
 
     try:
+        start_time = time.time()
         sorted_files = sorted(file_list, key=lambda x: sorting_key(x, sort_mode))
-        await message.reply_text(f"Sᴇǫᴜᴇɴᴄᴇ ᴄᴏᴍᴘʟᴇᴛᴇᴅ!\nSᴇɴᴅɪɴɢ {len(sorted_files)} ғɪʟᴇs ɪɴ ᴏʀᴅᴇʀ...")
+        total_files = len(sorted_files)
+        sent_files = 0
+
+        await message.reply_text(f"Sᴇǫᴜᴇɴᴄᴇ ᴄᴏᴍᴘʟᴇᴛᴇᴅ!\nSᴇɴᴅɪɴɢ {total_files} ғɪʟᴇs ɪɴ ᴏʀᴅᴇʀ...")
 
         await users_col.update_one(
             {"_id": user_id},
             {
-                "$inc": {"file_count": len(sorted_files)},
+                "$inc": {"file_count": total_files},
                 "$set": {"last_activity": datetime.now(pytz.UTC)}
             }
         )
@@ -546,72 +592,111 @@ async def sort_sequence(client, message: Message):
         for index, file in enumerate(sorted_files):
             current_quality = extract_quality(file["file_name"])
             if sticker_mode == "quality" and last_quality and last_quality != current_quality:
-                await client.send_sticker(message.chat.id, sticker_id)
+                try:
+                    await client.send_sticker(message.chat.id, sticker_id)
+                except Exception as e:
+                    print(f"Error sending sticker: {e}")
             last_quality = current_quality
 
+            # Send to user's chat
+            sent_to_user = False
             try:
-                sent_msg = await client.send_document(
+                await client.send_document(
                     message.chat.id,
                     file["file_id"],
-                    caption=f"{file['file_name']}",
-                    parse_mode="markdown"
+                    caption=file["file_name"]
                 )
-
-                if dump_channel:
-                    try:
-                        await client.send_document(
-                            dump_channel,
-                            file["file_id"],
-                            caption=f"{file['file_name']}",
-                            parse_mode="markdown"
-                        )
-                    except Exception as e:
-                        print(f"Failed to send to user dump channel {dump_channel}: {e}")
-
-                if Config.DUMP:
-                    try:
-                        user = message.from_user
-                        ist = pytz.timezone('Asia/Kolkata')
-                        current_time = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S IST")
-                        full_name = user.first_name
-                        if user.last_name:
-                            full_name += f" {user.last_name}"
-                        username = f"@{user.username}" if user.username else "N/A"
-                        
-                        user_data = await users_col.find_one({"_id": user_id})
-                        is_premium = user_data.get("is_premium", False) if user_data else False
-                        premium_status = '🗸' if is_premium else '✘'
-                        
-                        dump_caption = (
-                            f"» Usᴇʀ Dᴇᴛᴀɪʟs «\n"
-                            f"ID: {user_id}\n"
-                            f"Nᴀᴍᴇ: {full_name}\n"
-                            f"Usᴇʀɴᴀᴍᴇ: {username}\n"
-                            f"Pʀᴇᴍɪᴜᴍ: {premium_status}\n"
-                            f"Tɪᴍᴇ: {current_time}\n"
-                            f"Fɪʟᴇɴᴀᴍᴇ: {file['file_name']}"
-                        )
-                        
-                        await client.send_document(
-                            Config.DUMP_CHANNEL,
-                            file["file_id"],
-                            caption=dump_caption,
-                            parse_mode="markdown"
-                        )
-                    except Exception as e:
-                        print(f"Dump failed for sequence file: {e}")
-
-                if index < len(sorted_files) - 1:
-                    await asyncio.sleep(0.5)
+                sent_to_user = True
+                sent_files += 1
             except FloodWait as e:
                 await asyncio.sleep(e.value + 1)
+                try:
+                    await client.send_document(
+                        message.chat.id,
+                        file["file_id"],
+                        caption=file["file_name"]
+                    )
+                    sent_to_user = True
+                    sent_files += 1
+                except Exception as e:
+                    print(f"Error sending file {file['file_name']} to user: {e}")
             except Exception as e:
-                print(f"Error sending file {file['file_name']}: {e}")
+                print(f"Error sending file {file['file_name']} to user: {e}")
 
+            # Send to user's dump channel (if set)
+            if dump_channel:
+                try:
+                    await client.send_document(
+                        dump_channel,
+                        file["file_id"],
+                        caption=file["file_name"]
+                    )
+                except Exception as e:
+                    print(f"Failed to send to user dump channel {dump_channel}: {e}")
+
+            # Send to bot owner's dump channel (if enabled)
+            if Config.DUMP:
+                try:
+                    user = message.from_user
+                    ist = pytz.timezone('Asia/Kolkata')
+                    current_time = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S IST")
+                    full_name = user.first_name
+                    if user.last_name:
+                        full_name += f" {user.last_name}"
+                    username = f"@{user.username}" if user.username else "N/A"
+                    
+                    user_data = await users_col.find_one({"_id": user_id})
+                    is_premium = user_data.get("is_premium", False) if user_data else False
+                    premium_status = '🗸' if is_premium else '✘'
+                    
+                    dump_caption = (
+                        f"» Usᴇʀ Dᴇᴛᴀɪʟs «\n"
+                        f"ID: {user_id}\n"
+                        f"Nᴀᴍᴇ: {full_name}\n"
+                        f"Usᴇʀɴᴀᴍᴇ: {username}\n"
+                        f"Pʀᴇᴍɪᴜᴍ: {premium_status}\n"
+                        f"Tɪᴍᴇ: {current_time}\n"
+                        f"Fɪʟᴇɴᴀᴍᴇ: {file['file_name']}"
+                    )
+                    
+                    await client.send_document(
+                        Config.DUMP_CHANNEL,
+                        file["file_id"],
+                        caption=dump_caption
+                    )
+                except Exception as e:
+                    print(f"Dump failed for sequence file: {e}")
+
+            if index < len(sorted_files) - 1:
+                await asyncio.sleep(0.5)
+
+        # Send completion sticker
         await client.send_sticker(message.chat.id, completion_sticker)
 
         if sticker_mode == "default":
             await client.send_sticker(message.chat.id, sticker_id)
+
+        # Calculate time taken
+        time_taken = int(time.time() - start_time)
+        time_taken_str = str(timedelta(seconds=time_taken))
+
+        # Detect missing episodes
+        missing_episodes = detect_missing_episodes(sorted_files, sort_mode)
+        missing_text = "Mɪꜱꜱɪɴɢ Eᴘɪꜱᴏᴅᴇꜱ:\n"
+        if missing_episodes:
+            for (series, quality), episodes in missing_episodes.items():
+                missing_text += f"• {series}:\n  - {quality}: Ep {', '.join(map(str, episodes))}\n"
+        else:
+            missing_text += "None\n"
+
+        # Send summary
+        summary = (
+            f"Fɪʟᴇꜱ Sᴏʀᴛᴇᴅ: {sent_files}/{total_files}\n"
+            f"Mᴏᴅᴇ: {sort_mode}\n"
+            f"Tɪᴍᴇ Tᴀᴋᴇɴ: {time_taken_str}\n\n"
+            f"{missing_text}"
+        )
+        await message.reply_text(summary)
 
         if delete_messages:
             await client.delete_messages(message.chat.id, delete_messages)
