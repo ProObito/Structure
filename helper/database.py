@@ -2,10 +2,11 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from config import Config
 from datetime import datetime
 import pytz
+MONGO_URI = Config.DB_URL
 
 class CodeflixBots:
     def __init__(self):
-        self.client = AsyncIOMotorClient(Config.MONGO_URI)
+        self.client = AsyncIOMotorClient(MONGO_URI)
         self.db = self.client["file_sequence_bot"]
         self.users = self.db["users"]
         self.settings = self.db["settings"]
