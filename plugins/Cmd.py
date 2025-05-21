@@ -6,12 +6,12 @@ from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, 
 from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime, timedelta
 import pytz
-from config import Config, Txt, ADMINS, LOG_CHANNEL, OWNER_ID
+from config import Config
 from helper.database import codeflixbots
 
 # MongoDB client setup
-mongo_client = AsyncIOMotorClient(Config.MONGO_URI)
-db = mongo_client["file_sequence_bot"]
+mongo_client = AsyncIOMotorClient(Config.DB_URL)
+db = mongo_client[Config.DB_NAME]
 users_col = db["users"]
 settings_col = db["settings"]
 
@@ -19,11 +19,10 @@ settings_col = db["settings"]
 active_sequences = {}
 message_ids = {}
 
-# Admin mode check
-ADMIN_MODE = Config.ADMIN_MODE if hasattr(Config, 'ADMIN_MODE') else False
-ADMINS = Config.ADMINS if hasattr(Config, 'ADMINS') 
-OWNER_ID = Config.OWNER_ID if hasattr(Config, 'OWNER_ID')
-LOG_CHANNEL = Config.LOG_CHANNEL if hasattr(Config, 'LOG_CHANNEL') else False
+# Admin mode and admins
+ADMIN_MODE = Config.ADMIN_MODE
+ADMINS = Config.ADMINS
+
 # Quality order dictionary
 quality_order = {
     "144p": 1, "240p": 2, "360p": 3, "480p": 4,
@@ -98,7 +97,7 @@ def admin_only(func):
 def owner_only(func):
     async def wrapper(client, message: Message):
         user_id = message.from_user.id
-        if user_id != OWNER_ID:
+        if user_id != Config.OWNER_ID:
             await message.reply_text("This command is for the bot owner only!")
             return
         return await func(client, message)
@@ -160,12 +159,12 @@ async def start(client, message: Message):
     if Config.START_PIC:
         await message.reply_photo(
             Config.START_PIC,
-            caption=Txt.START_TXT.format(user.mention),
+            caption=Config.START_TXT.format(user.mention),
             reply_markup=buttons
         )
     else:
         await message.reply_text(
-            text=Txt.START_TXT.format(user.mention),
+            text=Config.START_TXT.format(user.mention),
             reply_markup=buttons,
             disable_web_page_preview=True
         )
@@ -502,7 +501,7 @@ async def set_sticker_mode(client, message: Message):
     )
 
 # Start Sequence Command Handler
-@Client.on_message(filters.command("Startsort") & filters.private)
+@Client.on_message(filters.command("ssequence") & filters.private)
 @check_ban_status
 async def start_sequence(client, message: Message):
     user_id = message.from_user.id
@@ -510,7 +509,7 @@ async def start_sequence(client, message: Message):
         return await message.reply_text("Aᴅᴍɪɴ ᴍᴏᴅᴇ ɪs ᴀᴄᴛɪᴠᴇ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ sᴇǫᴜᴇɴᴄᴇs!")
         
     if user_id in active_sequences:
-        await message.reply_text("A sᴇǫᴜᴇɴᴄᴇ ɪs ᴀʟʀᴇᴀᴅʏ ᴀᴄᴛɪᴠᴇ! Usᴇ /sort ᴛᴏ ᴇɴᴅ ɪᴛ.")
+        await message.reply_text("A sᴇǫᴜᴇɴᴄᴇ ɪs ᴀʟʀᴇᴀᴅʏ ᴀᴄᴛɪᴠᴇ! Usᴇ /esequence ᴛᴏ ᴇɴᴅ ɪᴛ.")
     else:
         active_sequences[user_id] = []
         message_ids[user_id] = []
@@ -518,15 +517,15 @@ async def start_sequence(client, message: Message):
         message_ids[user_id].append(msg.id)
 
 # End Sequence Command Handler
-@Client.on_message(filters.command("sort") & filters.private)
+@Client.on_message(filters.command("esequence") & filters.private)
 @check_ban_status
 async def end_sequence(client, message: Message):
     user_id = message.from_user.id
     if ADMIN_MODE and user_id not in ADMINS:
-        return await message.reply_text("Aᴅᴍɪɴ ᴍᴏᴅᴇ ɪs ᴀᴄᴛɪᴠᴇ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ!")
+        return await message.reply_text("Aᴅᴍɪɴ ᴍᴏᴅᴇ ɪs ᴀᴄᴛɪᴠᴇ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ sᴇǫᴜᴇɴᴄᴇs!")
     
     if user_id not in active_sequences:
-        return await message.reply_text("Nᴏ ᴀᴄᴛɪᴠᴇ sᴇǫᴜᴇɴᴄᴇ ғᴏᴜɴᴅ!")
+        return await message.reply_text("Nᴏ ᴀᴄᴛɪᴠᴇ sᴇǫᴜᴇɴᴄᴇ ғᴏᴜɴᴅ!\nUsᴇ /ssequence ᴛᴏ sᴛᴀʀᴛ ᴏɴᴇ.")
 
     file_list = active_sequences.pop(user_id, [])
     delete_messages = message_ids.pop(user_id, [])
@@ -636,7 +635,6 @@ async def end_sequence(client, message: Message):
     except Exception as e:
         print(f"Sequence processing failed: {e}")
         await message.reply_text("Fᴀɪʟᴇᴅ ᴛᴏ ᴘʀᴏᴄᴇss sᴇǫᴜᴇɴᴄᴇ! Cʜᴇᴄᴋ ʟᴏɢs ғᴏʀ ᴅᴇᴛᴀɪʟs.")
-
 # Help Command Handler
 @Client.on_message(filters.private & filters.command("help"))
 @check_ban_status
@@ -644,7 +642,7 @@ async def help_command(client, message):
     bot = await client.get_me()
     mention = bot.mention
     await message.reply_text(
-        text=Txt.HELP_TXT.format(mention=mention),
+        text=Config.HELP_TXT.format(mention=mention),
         disable_web_page_preview=True
     )
 
@@ -658,7 +656,7 @@ async def cb_handler(client, query: CallbackQuery):
 
     if data == "home":
         await query.message.edit_text(
-            text=Txt.START_TXT.format(query.from_user.mention),
+            text=Config.START_TXT.format(query.from_user.mention),
             disable_web_page_preview=True,
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("• ᴍʏ ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅs •", callback_data='help')],
@@ -669,17 +667,17 @@ async def cb_handler(client, query: CallbackQuery):
         )
     elif data == "help":
         await query.message.edit_text(
-            text=Txt.HELP_TXT.format(client.mention),
+            text=Config.HELP_TXT.format(client.mention),
             disable_web_page_preview=True
         )
     elif data == "about":
         await query.message.edit_text(
-            text=Txt.ABOUT_TXT,
+            text=Config.ABOUT_TXT,
             disable_web_page_preview=True,
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("• sᴜᴘᴘᴏʀᴛ", url='https://t.me/CodeflixSupport'),
                  InlineKeyboardButton("ᴄᴏᴍᴍᴀɴᴅs •", callback_data="help")],
-                [InlineKeyboardButton("• ᴅᴇᴠᴇʟᴏᴘᴇʀ", url='https://t.me/cosmic_awaken'),
+                [InlineKeyboardButton("• ᴅᴇᴠᴇʟᴏᴩᴇʀ", url='https://t.me/cosmic_freak'),
                  InlineKeyboardButton("ɴᴇᴛᴡᴏʀᴋ •", url='https://t.me/society_network')],
                 [InlineKeyboardButton("• ʙᴀᴄᴋ •", callback_data="home")]
             ])
