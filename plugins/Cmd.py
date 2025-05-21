@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import pytz
 from config import Config
 from helper.database import codeflixbots
+from pyrogram.errors import FloodWait  # Import FloodWait
 
 # MongoDB client setup
 mongo_client = AsyncIOMotorClient(Config.DB_URL)
@@ -109,10 +110,8 @@ async def start(client, message: Message):
     user = message.from_user
     user_id = user.id
     
-    # Add user to database if not exists
     await codeflixbots.add_user(client, message)
     
-    # Initialize user settings if not present
     await users_col.update_one(
         {"_id": user_id},
         {"$setOnInsert": {
@@ -126,14 +125,12 @@ async def start(client, message: Message):
         upsert=True
     )
 
-    # Initialize completion sticker if not set
     await settings_col.update_one(
         {"_id": "bot_settings"},
         {"$setOnInsert": {"completion_sticker": Config.DEFAULT_STICKER}},
         upsert=True
     )
 
-    # Initial interactive text and sticker sequence
     m = await message.reply_text("ʜᴇʜᴇ..ɪ'ᴍ ᴀɴʏᴀ!\nᴡᴀɪᴛ ᴀ ᴍᴏᴍᴇɴᴛ. . .")
     await asyncio.sleep(0.4)
     await m.edit_text("🎊")
@@ -144,10 +141,8 @@ async def start(client, message: Message):
     await asyncio.sleep(0.4)
     await m.delete()
 
-    # Send sticker after the text sequence
     await message.reply_sticker(Config.DEFAULT_STICKER)
 
-    # Define buttons for the start message
     buttons = InlineKeyboardMarkup([
         [InlineKeyboardButton("• ᴍʏ ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅs •", callback_data='help')],
         [InlineKeyboardButton('• ᴜᴘᴅᴀᴛᴇs', url='https://t.me/Codeflix_Bots'),
@@ -155,7 +150,6 @@ async def start(client, message: Message):
         [InlineKeyboardButton('• ᴀʙᴏᴜᴛ', callback_data='about')]
     ])
 
-    # Send start message with or without picture
     if Config.START_PIC:
         await message.reply_photo(
             Config.START_PIC,
@@ -175,19 +169,16 @@ async def start(client, message: Message):
 async def handle_file(client, message: Message):
     user_id = message.from_user.id
     
-    # Automatically start a sequence if not already active
     if user_id not in active_sequences:
         active_sequences[user_id] = []
         message_ids[user_id] = []
         msg = await message.reply_text("Sᴇǫᴜᴇɴᴄᴇ ʜᴀs ʙᴇᴇɴ sᴛᴀʀᴛᴇᴅ! Sᴇɴᴅ ʏᴏᴜʀ ғɪʟᴇs...")
         message_ids[user_id].append(msg.id)
     
-    # Add file to sequence
     file_name = message.document.file_name if message.document else message.video.file_name
     file_id = message.document.file_id if message.document else message.video.file_id
     active_sequences[user_id].append({"file_id": file_id, "file_name": file_name})
     
-    # Send confirmation with file count
     file_count = len(active_sequences[user_id])
     await message.reply_text(f"Fɪʟᴇ Aᴅᴅᴇᴅ Iɴ Qᴜᴇᴜᴇ {file_count}")
 
@@ -248,11 +239,19 @@ async def set_complete_sticker(client, message: Message):
 @Client.on_message(filters.private & filters.command("leaderboard"))
 @check_ban_status
 async def leaderboard(client, message: Message):
+    user_id = message.from_user.id
+    user_data = await users_col.find_one({"_id": user_id})
+    current_timeframe = user_data.get("leaderboard_timeframe", "day")  # Default to "day"
+
     buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Day", callback_data="leaderboard_day"),
-         InlineKeyboardButton("Week", callback_data="leaderboard_week")],
-        [InlineKeyboardButton("Month", callback_data="leaderboard_month"),
-         InlineKeyboardButton("All Time", callback_data="leaderboard_all")]
+        [
+            InlineKeyboardButton(f"Day{' ✔' if current_timeframe == 'day' else ''}", callback_data="leaderboard_day"),
+            InlineKeyboardButton(f"Week{' ✔' if current_timeframe == 'week' else ''}", callback_data="leaderboard_week")
+        ],
+        [
+            InlineKeyboardButton(f"Month{' ✔' if current_timeframe == 'month' else ''}", callback_data="leaderboard_month"),
+            InlineKeyboardButton(f"All Time{' ✔' if current_timeframe == 'all' else ''}", callback_data="leaderboard_all")
+        ]
     ])
     await message.reply_text(
         "Select a leaderboard timeframe:",
@@ -465,10 +464,14 @@ async def set_sort_mode(client, message: Message):
     current_mode = user_data.get("sort_mode", "episode")
     
     buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Quality", callback_data="sort_quality"),
-         InlineKeyboardButton("Title", callback_data="sort_title")],
-        [InlineKeyboardButton("Both", callback_data="sort_both"),
-         InlineKeyboardButton("Episode", callback_data="sort_episode")],
+        [
+            InlineKeyboardButton(f"Quality{' ✔' if current_mode == 'quality' else ''}", callback_data="sort_quality"),
+            InlineKeyboardButton(f"Title{' ✔' if current_mode == 'title' else ''}", callback_data="sort_title")
+        ],
+        [
+            InlineKeyboardButton(f"Both{' ✔' if current_mode == 'both' else ''}", callback_data="sort_both"),
+            InlineKeyboardButton(f"Episode{' ✔' if current_mode == 'episode' else ''}", callback_data="sort_episode")
+        ],
         [InlineKeyboardButton("Close", callback_data="close")]
     ])
     await message.reply_text(
@@ -489,8 +492,10 @@ async def set_sticker_mode(client, message: Message):
     current_mode = user_data.get("sticker_mode", "default")
     
     buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Quality", callback_data="sticker_quality"),
-         InlineKeyboardButton("Default", callback_data="sticker_default")],
+        [
+            InlineKeyboardButton(f"Quality{' ✔' if current_mode == 'quality' else ''}", callback_data="sticker_quality"),
+            InlineKeyboardButton(f"Default{' ✔' if current_mode == 'default' else ''}", callback_data="sticker_default")
+        ],
         [InlineKeyboardButton("Close", callback_data="close")]
     ])
     await message.reply_text(
@@ -500,32 +505,16 @@ async def set_sticker_mode(client, message: Message):
         reply_markup=buttons
     )
 
-# Start Sequence Command Handler
-@Client.on_message(filters.command("ssequence") & filters.private)
+# Sort Command Handler (Replaces /esequence)
+@Client.on_message(filters.command("sort") & filters.private)
 @check_ban_status
-async def start_sequence(client, message: Message):
-    user_id = message.from_user.id
-    if ADMIN_MODE and user_id not in ADMINS:
-        return await message.reply_text("Aᴅᴍɪɴ ᴍᴏᴅᴇ ɪs ᴀᴄᴛɪᴠᴇ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ sᴇǫᴜᴇɴᴄᴇs!")
-        
-    if user_id in active_sequences:
-        await message.reply_text("A sᴇǫᴜᴇɴᴄᴇ ɪs ᴀʟʀᴇᴀᴅʏ ᴀᴄᴛɪᴠᴇ! Usᴇ /esequence ᴛᴏ ᴇɴᴅ ɪᴛ.")
-    else:
-        active_sequences[user_id] = []
-        message_ids[user_id] = []
-        msg = await message.reply_text("Sᴇǫᴜᴇɴᴄᴇ ʜᴀs ʙᴇᴇɴ sᴛᴀʀᴛᴇᴅ! Sᴇɴᴅ ʏᴏᴜʀ ғɪʟᴇs...")
-        message_ids[user_id].append(msg.id)
-
-# End Sequence Command Handler
-@Client.on_message(filters.command("esequence") & filters.private)
-@check_ban_status
-async def end_sequence(client, message: Message):
+async def sort_sequence(client, message: Message):
     user_id = message.from_user.id
     if ADMIN_MODE and user_id not in ADMINS:
         return await message.reply_text("Aᴅᴍɪɴ ᴍᴏᴅᴇ ɪs ᴀᴄᴛɪᴠᴇ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ sᴇǫᴜᴇɴᴄᴇs!")
     
     if user_id not in active_sequences:
-        return await message.reply_text("Nᴏ ᴀᴄᴛɪᴠᴇ sᴇǫᴜᴇɴᴄᴇ ғᴏᴜɴᴅ!\nUsᴇ /ssequence ᴛᴏ sᴛᴀʀᴛ ᴏɴᴇ.")
+        return await message.reply_text("Nᴏ ᴀᴄᴛɪᴠᴇ sᴇǫᴜᴇɴᴄᴇ ғᴏᴜɴᴅ! Sᴇɴᴅ ғɪʟᴇs ᴛᴏ sᴛᴀʀᴛ ᴏɴᴇ.")
 
     file_list = active_sequences.pop(user_id, [])
     delete_messages = message_ids.pop(user_id, [])
@@ -545,7 +534,6 @@ async def end_sequence(client, message: Message):
         sorted_files = sorted(file_list, key=lambda x: sorting_key(x, sort_mode))
         await message.reply_text(f"Sᴇǫᴜᴇɴᴄᴇ ᴄᴏᴍᴘʟᴇᴛᴇᴅ!\nSᴇɴᴅɪɴɢ {len(sorted_files)} ғɪʟᴇs ɪɴ ᴏʀᴅᴇʀ...")
 
-        # Update file count and last activity in database
         await users_col.update_one(
             {"_id": user_id},
             {
@@ -569,7 +557,6 @@ async def end_sequence(client, message: Message):
                     parse_mode="markdown"
                 )
 
-                # Send to user's dump channel (if set) without forward mark
                 if dump_channel:
                     try:
                         await client.send_document(
@@ -581,7 +568,6 @@ async def end_sequence(client, message: Message):
                     except Exception as e:
                         print(f"Failed to send to user dump channel {dump_channel}: {e}")
 
-                # Send to bot owner's dump channel (if enabled) without forward mark
                 if Config.DUMP:
                     try:
                         user = message.from_user
@@ -622,10 +608,8 @@ async def end_sequence(client, message: Message):
             except Exception as e:
                 print(f"Error sending file {file['file_name']}: {e}")
 
-        # Send completion sticker
         await client.send_sticker(message.chat.id, completion_sticker)
 
-        # Send user sticker at the end if default mode
         if sticker_mode == "default":
             await client.send_sticker(message.chat.id, sticker_id)
 
@@ -635,6 +619,27 @@ async def end_sequence(client, message: Message):
     except Exception as e:
         print(f"Sequence processing failed: {e}")
         await message.reply_text("Fᴀɪʟᴇᴅ ᴛᴏ ᴘʀᴏᴄᴇss sᴇǫᴜᴇɴᴄᴇ! Cʜᴇᴄᴋ ʟᴏɢs ғᴏʀ ᴅᴇᴛᴀɪʟs.")
+
+# Bought Command Handler
+@Client.on_message(filters.command("bought") & filters.private)
+@check_ban_status
+async def bought(client, message):
+    msg = await message.reply('Wait im checking...')
+    replied = message.reply_to_message
+
+    if not replied:
+        await msg.edit("<b>Please reply with the screenshot of your payment for the premium purchase to proceed.\n\nFor example, first upload your screenshot, then reply to it using the '/bought' command</b>")
+    elif replied.photo:
+        await client.send_photo(
+            chat_id=Config.LOG_CHANNEL,
+            photo=replied.photo.file_id,
+            caption=f'<b>User - {message.from_user.mention}\nUser id - <code>{message.from_user.id}</code>\nUsername - <code>{message.from_user.username}</code>\nName - <code>{message.from_user.first_name}</code></b>',
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("Close", callback_data="close_data")]
+            ])
+        )
+        await msg.edit_text('<b>Your screenshot has been sent to Admins</b>')
+
 # Help Command Handler
 @Client.on_message(filters.private & filters.command("help"))
 @check_ban_status
@@ -688,11 +693,22 @@ async def cb_handler(client, query: CallbackQuery):
             {"_id": user_id},
             {"$set": {"sort_mode": sort_mode}}
         )
+        user_data = await users_col.find_one({"_id": user_id})
+        current_mode = user_data.get("sort_mode", "episode")
+        buttons = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(f"Quality{' ✔' if current_mode == 'quality' else ''}", callback_data="sort_quality"),
+                InlineKeyboardButton(f"Title{' ✔' if current_mode == 'title' else ''}", callback_data="sort_title")
+            ],
+            [
+                InlineKeyboardButton(f"Both{' ✔' if current_mode == 'both' else ''}", callback_data="sort_both"),
+                InlineKeyboardButton(f"Episode{' ✔' if current_mode == 'episode' else ''}", callback_data="sort_episode")
+            ],
+            [InlineKeyboardButton("Close", callback_data="close")]
+        ])
         await query.message.edit_text(
             f"Sorting mode set to: {sort_mode.capitalize()}",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("Close", callback_data="close")]
-            ])
+            reply_markup=buttons
         )
     elif data in ["sticker_quality", "sticker_default"]:
         sticker_mode = data.split("_")[1]
@@ -700,14 +716,25 @@ async def cb_handler(client, query: CallbackQuery):
             {"_id": user_id},
             {"$set": {"sticker_mode": sticker_mode}}
         )
+        user_data = await users_col.find_one({"_id": user_id})
+        current_mode = user_data.get("sticker_mode", "default")
+        buttons = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(f"Quality{' ✔' if current_mode == 'quality' else ''}", callback_data="sticker_quality"),
+                InlineKeyboardButton(f"Default{' ✔' if current_mode == 'default' else ''}", callback_data="sticker_default")
+            ],
+            [InlineKeyboardButton("Close", callback_data="close")]
+        ])
         await query.message.edit_text(
             f"Sticker mode set to: {sticker_mode.capitalize()}",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("Close", callback_data="close")]
-            ])
+            reply_markup=buttons
         )
     elif data.startswith("leaderboard_"):
         timeframe = data.split("_")[1]
+        await users_col.update_one(
+            {"_id": user_id},
+            {"$set": {"leaderboard_timeframe": timeframe}}
+        )
         if timeframe == "day":
             start_time = datetime.now(pytz.UTC).replace(hour=0, minute=0, second=0, microsecond=0)
         elif timeframe == "week":
@@ -724,11 +751,19 @@ async def cb_handler(client, query: CallbackQuery):
         for idx, user in enumerate(leaderboard, 1):
             text += f"{idx}. User ID: {user['_id']} - Files Sorted: {user['file_count']}\n"
         
+        buttons = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(f"Day{' ✔' if timeframe == 'day' else ''}", callback_data="leaderboard_day"),
+                InlineKeyboardButton(f"Week{' ✔' if timeframe == 'week' else ''}", callback_data="leaderboard_week")
+            ],
+            [
+                InlineKeyboardButton(f"Month{' ✔' if timeframe == 'month' else ''}", callback_data="leaderboard_month"),
+                InlineKeyboardButton(f"All Time{' ✔' if timeframe == 'all' else ''}", callback_data="leaderboard_all")
+            ]
+        ])
         await query.message.edit_text(
             text or "No data available for this timeframe.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("Close", callback_data="close")]
-            ])
+            reply_markup=buttons
         )
     elif data == "close":
         try:
