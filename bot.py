@@ -11,6 +11,7 @@ import pyromod
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 import time
+from plugins.Cmd import settings_col  # Import settings_col
 
 pyrogram.utils.MIN_CHANNEL_ID = -1009147483647
 
