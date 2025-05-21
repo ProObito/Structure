@@ -33,6 +33,15 @@ class Bot(Client):
         )
         # Initialize the bot's start time for uptime calculation
         self.start_time = time.time()
+        
+        async def load_settings():
+    global ADMIN_MODE
+    settings = await settings_col.find_one({"_id": "bot_settings"})
+    if settings:
+        ADMIN_MODE = settings.get("admin_mode", False)
+    admin_data = await settings_col.find_one({"_id": "admins"})
+    if admin_data:
+        Config.ADMINS.extend(admin_data.get("admin_ids", []))
 
     async def start(self, *args, **kwargs):
         await super().start(*args, **kwargs)
