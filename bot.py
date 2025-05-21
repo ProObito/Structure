@@ -20,7 +20,6 @@ SUPPORT_CHAT = int(os.environ.get("SUPPORT_CHAT", "-1002078429106"))
 PORT = Config.PORT
 
 class Bot(Client):
-
     def __init__(self):
         super().__init__(
             name="codeflixbots",
@@ -33,18 +32,19 @@ class Bot(Client):
         )
         # Initialize the bot's start time for uptime calculation
         self.start_time = time.time()
-        
-        async def load_settings():
-    global ADMIN_MODE
-    settings = await settings_col.find_one({"_id": "bot_settings"})
-    if settings:
-        ADMIN_MODE = settings.get("admin_mode", False)
-    admin_data = await settings_col.find_one({"_id": "admins"})
-    if admin_data:
-        Config.ADMINS.extend(admin_data.get("admin_ids", []))
+
+    async def load_settings(self):
+        global ADMIN_MODE
+        settings = await settings_col.find_one({"_id": "bot_settings"})
+        if settings:
+            ADMIN_MODE = settings.get("admin_mode", False)
+        admin_data = await settings_col.find_one({"_id": "admins"})
+        if admin_data:
+            Config.ADMINS.extend(admin_data.get("admin_ids", []))
 
     async def start(self, *args, **kwargs):
         await super().start(*args, **kwargs)
+        await self.load_settings()  # Call load_settings
         me = await self.get_me()
         self.mention = me.mention
         self.username = me.username  
@@ -71,7 +71,7 @@ class Bot(Client):
                     photo=Config.START_PIC,
                     caption=(
                         "**ᴀɴʏᴀ ɪs ʀᴇsᴛᴀʀᴛᴇᴅ ᴀɢᴀɪɴ  !**\n\n"
-                        f"ɪ ᴅɪᴅɴ'ᴛ sʟᴇᴘᴛ sɪɴᴄᴇ​: `{uptime_string}`"
+                        f"ɪ ᴅɪᴅɴ'ᴛ sʟᴇᴘᴛ sɪɴᴄᴇ: `{uptime_string}`"
                     ),
                     reply_markup=InlineKeyboardMarkup(
                         [[
