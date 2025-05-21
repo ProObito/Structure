@@ -5,49 +5,33 @@ id_pattern = re.compile(r'^.\d+$')
 
 class Config(object):
     class Config:
-    # Bot token from BotFather
-    BOT_TOKEN = "7932515290:AAErP6vIZw6JuI79RN2pJohjLfnDMCTjSEY"
-    
-    # API ID and Hash from my.telegram.org
-    API_ID = 20718334
-    API_HASH = "4e81464b29d79c58d0ad8a0c55ece4a5"
-    
-    # MongoDB URI for database
-    MONGO_URI = "mongodb+srv://spxsolo:umaid2008@cluster0.7fbux.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-    
-    # Default sticker ID for new users and completion sticker
-    DEFAULT_STICKER = "CAACAgUAAxkBAAEFBAVoH4qTFGwjwrCkLJPeM0HjglJpYgACXAgAArSfGVXK3kCuYAiK2B4E"
-    
-    # Start picture URL (optional)
-    START_PIC = "https://graph.org/file/29a3acbbab9de5f45a5fe.jpg"
-    
-    # Dump channel ID for bot owner's dump
-    DUMP_CHANNEL = -1002200709110  # Replace with your channel ID
-    
-    # Enable/disable dumping files to the bot owner's dump channel
+
+    API_ID    = os.environ.get("API_ID", "28264594")
+    API_HASH  = os.environ.get("API_HASH", "94ca8a089020a2290fd29a41f18acb94")
+    BOT_TOKEN = os.environ.get("BOT_TOKEN", "7932515290:AAErP6vIZw6JuI79RN2pJohjLfnDMCTjSEY") 
+    USER_SESSION_STRING = os.environ.get("USER_SESSION_STRING", "")
+#------------------------------------
+    DB_NAME = os.environ.get("DB_NAME","Rename")     
+    DB_URL  = os.environ.get("DB_URL","mongodb+srv://spxsolo:umaid2008@cluster0.7fbux.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+    PORT = os.environ.get("PORT", "6970")
+ #------------------------------------
+    BOT_UPTIME  = time.time()
+#------------------------------------
+    START_PIC   = os.environ.get("START_PIC", "https://telegra.ph/file/223de6d04641c9068251c-31b2b459f088ee3cf6.jpg")
+    DEFAULT_STICKER   = "CAACAgUAAxkBAAEFBAVoH4qTFGwjwrCkLJPeM0HjglJpYgACXAgAArSfGVXK3kCuYAiK2B4E"
+    FORCE_PIC   = os.environ.get("FORCE_PIC", "https://telegra.ph/file/27484e767ef1ddd1da72c-162a07065bf8208ed6.jpg")
+    PICS = (environ.get('PICS', 'https://telegra.ph/file/27484e767ef1ddd1da72c-162a07065bf8208ed6.jpg https://telegra.ph/file/223de6d04641c9068251c-31b2b459f088ee3cf6.jpg https://telegra.ph/file/e3406c9810b5a3f6dd7bd-fe243b6093dbd55970.jpg')).split()  # Sample pic
+#------------------------------------
+    OWNER_ID = 5585016974
+    ADMINS       = [int(admins) if id_pattern.search(admins) else admins for admins in os.environ.get('ADMINS', '5585016974 6497757690 7328629001').split()]
+    ADMIN       = [int(admin) if id_pattern.search(admin) else admin for admin in os.environ.get('ADMIN', '5585016974 6497757690 7328629001').split()]
+#------------------------------------
+    FORCE_SUB_CHANNELS = os.environ.get('FORCE_SUB_CHANNELS', 'animes_crew, weebxcrew').split(', ')
+    LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "-1001868871195")
+    DUMP_CHANNEL = os.environ.get("DUMP_CHANNEL", "-1001868871195")
     DUMP = True
-    
     # Admin mode (True/False)
-    ADMIN_MODE = False
-    
-    # List of admin user IDs
-    ADMINS = [123456789, 987654321]  # Replace with actual admin IDs
-    
-    # Bot owner ID (for owner-only commands like /setcompletesticker)
-    OWNER_ID = 5585016974  # Replace with your user ID
-    
-    # Log channel ID for premium purchase screenshots
-    LOG_CHANNEL = -1001868871195  # Replace with your log channel ID
-    PORT = os.environ.get("PORT", "8080")
-    FORCE_SUB_CHANNELS = os.environ.get('FORCE_SUB_CHANNELS', 'CodeFlix_Bots, CodeflixSupport').split(', ')
-    
-    # wes response configuration     
-    WEBHOOK = bool(os.environ.get("WEBHOOK", "True"))
-
-
-class Txt(object):
-    # part of text configuration
-        
+    ADMIN_MODE = False  
     START_TXT = """<b>ʜᴇʏ! {}  
 
 » ɪ ᴀᴍ ᴀᴅᴠᴀɴᴄᴇᴅ ʀᴇɴᴀᴍᴇ ʙᴏᴛ! ᴡʜɪᴄʜ ᴄᴀɴ ᴀᴜᴛᴏʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ғɪʟᴇs ᴡɪᴛʜ ᴄᴜsᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ ᴀɴᴅ ᴛʜᴜᴍʙɴᴀɪʟ ᴀɴᴅ ᴀʟsᴏ sᴇǫᴜᴇɴᴄᴇ ᴛʜᴇᴍ ᴘᴇʀғᴇᴄᴛʟʏ</b>"""
