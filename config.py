@@ -6,14 +6,14 @@ id_pattern = re.compile(r'^.\d+$')
 class Config(object):
     class Config:
     # Bot token from BotFather
-    BOT_TOKEN = "your_bot_token_here"
+    BOT_TOKEN = "7976984538:AAGLp9tX4gD3oepR40KtD6ANwYH-Hy6GPOY"
     
     # API ID and Hash from my.telegram.org
-    API_ID = 1234567
-    API_HASH = "your_api_hash_here"
+    API_ID = 20718334
+    API_HASH = "4e81464b29d79c58d0ad8a0c55ece4a5"
     
     # MongoDB URI for database
-    MONGO_URI = "mongodb+srv://username:password@cluster0.mongodb.net/?retryWrites=true&w=majority"
+    MONGO_URI = "mongodb+srv://spxsolo:umaid2008@cluster0.7fbux.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
     
     # Default sticker ID for new users and completion sticker
     DEFAULT_STICKER = "CAACAgUAAxkBAAEFBAVoH4qTFGwjwrCkLJPeM0HjglJpYgACXAgAArSfGVXK3kCuYAiK2B4E"
