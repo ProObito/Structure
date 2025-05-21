@@ -6,7 +6,7 @@ id_pattern = re.compile(r'^.\d+$')
 class Config(object):
     class Config:
     # Bot token from BotFather
-    BOT_TOKEN = "7976984538:AAGLp9tX4gD3oepR40KtD6ANwYH-Hy6GPOY"
+    BOT_TOKEN = "7932515290:AAErP6vIZw6JuI79RN2pJohjLfnDMCTjSEY"
     
     # API ID and Hash from my.telegram.org
     API_ID = 20718334
@@ -22,7 +22,7 @@ class Config(object):
     START_PIC = "https://graph.org/file/29a3acbbab9de5f45a5fe.jpg"
     
     # Dump channel ID for bot owner's dump
-    DUMP_CHANNEL = -1001868871195  # Replace with your channel ID
+    DUMP_CHANNEL = -1002200709110  # Replace with your channel ID
     
     # Enable/disable dumping files to the bot owner's dump channel
     DUMP = True
