@@ -4,23 +4,42 @@ id_pattern = re.compile(r'^.\d+$')
 
 
 class Config(object):
-    # pyro client config
-    API_ID    = os.environ.get("API_ID", "")
-    API_HASH  = os.environ.get("API_HASH", "")
-    BOT_TOKEN = os.environ.get("BOT_TOKEN", "736532225-w") 
-
-    # database config
-    DB_NAME = os.environ.get("DB_NAME","Yato")     
-    DB_URL  = os.environ.get("DB_URL","mongodb")
+    class Config:
+    # Bot token from BotFather
+    BOT_TOKEN = "your_bot_token_here"
+    
+    # API ID and Hash from my.telegram.org
+    API_ID = 1234567
+    API_HASH = "your_api_hash_here"
+    
+    # MongoDB URI for database
+    MONGO_URI = "mongodb+srv://username:password@cluster0.mongodb.net/?retryWrites=true&w=majority"
+    
+    # Default sticker ID for new users and completion sticker
+    DEFAULT_STICKER = "CAACAgUAAxkBAAEFBAVoH4qTFGwjwrCkLJPeM0HjglJpYgACXAgAArSfGVXK3kCuYAiK2B4E"
+    
+    # Start picture URL (optional)
+    START_PIC = "https://graph.org/file/29a3acbbab9de5f45a5fe.jpg"
+    
+    # Dump channel ID for bot owner's dump
+    DUMP_CHANNEL = -1001868871195  # Replace with your channel ID
+    
+    # Enable/disable dumping files to the bot owner's dump channel
+    DUMP = True
+    
+    # Admin mode (True/False)
+    ADMIN_MODE = False
+    
+    # List of admin user IDs
+    ADMINS = [123456789, 987654321]  # Replace with actual admin IDs
+    
+    # Bot owner ID (for owner-only commands like /setcompletesticker)
+    OWNER_ID = 5585016974  # Replace with your user ID
+    
+    # Log channel ID for premium purchase screenshots
+    LOG_CHANNEL = -1001868871195  # Replace with your log channel ID
     PORT = os.environ.get("PORT", "8080")
- 
-    # other configs
-    BOT_UPTIME  = time.time()
-    START_PIC   = os.environ.get("START_PIC", "https://graph.org/file/29a3acbbab9de5f45a5fe.jpg")
-    ADMIN       = [int(admin) if id_pattern.search(admin) else admin for admin in os.environ.get('ADMIN', '6497757690').split()]
-    FORCE_SUB_CHANNELS = os.environ.get('FORCE_SUB_CHANNELS', 'codeflix_bots').split(',')
-    LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1001868871195"))
-    DUMP_CHANNEL = int(os.environ.get("DUMP_CHANNEL", "-1001868871195"))
+    FORCE_SUB_CHANNELS = os.environ.get('FORCE_SUB_CHANNELS', 'CodeFlix_Bots, CodeflixSupport').split(', ')
     
     # wes response configuration     
     WEBHOOK = bool(os.environ.get("WEBHOOK", "True"))
